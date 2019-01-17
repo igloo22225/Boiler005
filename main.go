@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/base32"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -31,20 +32,36 @@ func introText() {
 
 func getActivationCode(url string) string {
 	location := strings.Index(url, "activate/") //Look through the URL to find where the token should be, pull it and return it
-	location = location + 9
+	location = location + 9                     //While not the most graceful at handling errors, we have already checked for the most common URL failures
 	activationToken := string(url[location : location+20])
 	return activationToken
 }
 
-func getHOTPToken(body []byte) string {
-	bodyString := string(body) //Not the cleanest way of dealing with this issue, though I don't need any of the other data and it works just as well.
-	location := strings.Index(bodyString, "\"hotp_secret\":")
-	location = location + 16
-	HOTPToken := string(bodyString[location : location+32])
-	return HOTPToken
-}
-
 func registerAsClient(activationToken string) string {
+	type DuoResponse struct {
+		Response struct {
+			Akey                   string  `json:"akey"`
+			AppStatus              float64 `json:"app_status"`
+			CurrentAppVersion      string  `json:"current_app_version"`
+			CurrentOsVersion       string  `json:"current_os_version"`
+			CustomerName           string  `json:"customer_name"`
+			ForceDisableAnalytics  bool    `json:"force_disable_analytics"`
+			HasBackupRestore       bool    `json:"has_backup_restore"`
+			HasBluetoothApprove    bool    `json:"has_bluetooth_approve"`
+			HasDeviceInsight       bool    `json:"has_device_insight"`
+			HasTrustedEndpoints    bool    `json:"has_trusted_endpoints"`
+			HotpSecret             string  `json:"hotp_secret"`
+			IsFipsDeployment       bool    `json:"is_fips_deployment"`
+			OsStatus               float64 `json:"os_status"`
+			Pkey                   string  `json:"pkey"`
+			ReactivationToken      string  `json:"reactivation_token"`
+			RequiresFipsAndroid    bool    `json:"requires_fips_android"`
+			RequiresMdm            float64 `json:"requires_mdm"`
+			SecurityCheckupEnabled bool    `json:"security_checkup_enabled"`
+			UrgSecret              string  `json:"urg_secret"`
+		} `json:"response"`
+		Stat string `json:"stat"`
+	}
 	client := &http.Client{}
 	data := url.Values{}
 	data.Set("app_id", "com.duosecurity.duomobile.app.DMApplication") //This data has to be sent as post data as Duo doesn't want to give it to just any device
@@ -77,13 +94,32 @@ func registerAsClient(activationToken string) string {
 		fmt.Println("response Headers:", resp.Header)
 		fmt.Println("response Body:", string(body))
 	}
-	HOTPToken := getHOTPToken(body)
+	var DecodedResp DuoResponse
+	error := json.Unmarshal(body, &DecodedResp)
+	if error != nil {
+		fmt.Println("JSON parsing error, check Duo's JSON response.")
+		fmt.Println("response Body:", string(body))
+		panic(err)
+	}
+	if debugMode == true {
+		fmt.Println("Response: " + DecodedResp.Stat)
+		fmt.Println("Token: " + DecodedResp.Response.HotpSecret)
+	}
+	HOTPToken := DecodedResp.Response.HotpSecret
 	return HOTPToken
 }
 
 func validateURL(urlIn string) bool {
-	_, err := url.ParseRequestURI(urlIn)
+	url, err := url.ParseRequestURI(urlIn)
 	if err != nil {
+		return false
+	}
+	if url.Host != "m-1b9bef70.duosecurity.com" { //Run some basic sanity checks
+		fmt.Println("That doesn't look like a BoilerKey URL! Please restart and try again.")
+		return false
+	}
+	if len(urlIn) != 66 {
+		fmt.Println("That doesn't look like a BoilerKey URL! Please restart and try again.")
 		return false
 	}
 	return true
@@ -112,6 +148,10 @@ func getDuoData() string {
 
 func generateQRCode(HOTPToken string) {
 	fmt.Println("Generating QR Code...")
+	if HOTPToken == "" {
+		fmt.Println("Error: HOTP Token not present. Something went wrong.")
+		os.Exit(1)
+	}
 	QRCode := base32.StdEncoding.EncodeToString([]byte(HOTPToken))
 	QRCode = "otpauth://hotp/Purdue_Boiler_Key?secret=" + QRCode
 	err := qrcode.WriteFile(QRCode, qrcode.Medium, 256, "bk.png")
