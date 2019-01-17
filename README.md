@@ -22,6 +22,6 @@ Because it enables Purdue's 2fa to be interoperable with your choice of applicat
 Made specifically to help me dissuade friends from auto-login approval scripts on their mobile devices.
 
 ### Thanks to
-[Skip2](https://github.com/skip2) - QR Code generation library
-[Skratchdot](https://github.com/skratchdot) - Open file library
-[elnardu](https://github.com/elnardu) - For figuring out how the handshake works. URLs and Post information utilized from their [local-boilerkey](https://github.com/elnardu/local-boilerkey) script.
+[Skip2](https://github.com/skip2) - QR Code generation library          
+[Skratchdot](https://github.com/skratchdot) - Open file library             
+[elnardu](https://github.com/elnardu) - For figuring out how the handshake works. URLs and Post information utilized from their [local-boilerkey](https://github.com/elnardu/local-boilerkey) script.             
