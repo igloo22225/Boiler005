@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	qrcode "github.com/skip2/go-qrcode"
@@ -110,18 +111,17 @@ func registerAsClient(activationToken string) string {
 }
 
 func validateURL(urlIn string) bool {
-	url, err := url.ParseRequestURI(urlIn)
+	_, err := url.ParseRequestURI(urlIn)
 	if err != nil {
 		return false
 	}
-	if url.Host != "m-1b9bef70.duosecurity.com" { //Run some basic sanity checks
+
+	match, _ := regexp.MatchString(`https:\/\/m-1b9bef70\.duosecurity.com\/activate\/[a-zA-Z0-9]+`, urlIn)
+	if !match {
 		fmt.Println("That doesn't look like a BoilerKey URL! Please restart and try again.")
 		return false
 	}
-	if len(urlIn) != 66 {
-		fmt.Println("That doesn't look like a BoilerKey URL! Please restart and try again.")
-		return false
-	}
+
 	return true
 }
 
@@ -129,6 +129,8 @@ func getDuoData() string {
 	url := "" //Take the user's URL
 	reader := bufio.NewReader(os.Stdin)
 	url, err := reader.ReadString('\n')
+	url = strings.TrimSpace(url)
+
 	if err != nil {
 		fmt.Println("Error reading URL, please restart.") //If for whatever reason the string isn't readable, yell
 		os.Exit(1)
